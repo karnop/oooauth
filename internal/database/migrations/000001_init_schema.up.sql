@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS users (
     last_sign_in_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-)
+);
 
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 
@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS sessions (
     revoked_at TIMESTAMPTZ,
     last_active_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-)
+);
 
 -- partial index for high speed active session lookups
 CREATE INDEX IF NOT EXISTS idx_sessions_token_hash

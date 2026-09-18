@@ -8,7 +8,7 @@ import (
 
 type Session struct {
 	ID           uuid.UUID  `json:"id"`
-	UserId       uuid.UUID  `json:"user_id"`
+	UserID       uuid.UUID  `json:"user_id"`
 	TokenHash    string     `json:"-"` // not sending to user
 	IPAddress    *string    `json:"ip_address,omitempty"`
 	UserAgent    *string    `json:"user_agent,omitempty"`
@@ -19,7 +19,7 @@ type Session struct {
 }
 
 // isValid checks if the session is currently active and not expired or revoked
-func (s *Session) isValid() bool {
+func (s *Session) IsValid() bool {
 	if s.RevokedAt != nil {
 		return false
 	}
