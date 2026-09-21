@@ -1,9 +1,11 @@
 package config
 
 import (
+	"bufio"
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -21,6 +23,11 @@ type Config struct {
 }
 
 func Load() (*Config, error) {
+	// Auto-load .env file if present in the working directory
+	if err := loadEnvFile(".env"); err != nil {
+		return nil, fmt.Errorf("failed to load env file: %w", err)
+	}
+
 	port := getEnv("PORT", "8080")
 	env := getEnv("ENV", "development")
 	dbURL := getEnv("DATABASE_URL", "")
@@ -53,4 +60,41 @@ func getEnv(key, defaultValue string) string {
 		return val
 	}
 	return defaultValue
+}
+
+// loadEnvFile parses key=value pairs from a .env file without overriding existing system envs
+func loadEnvFile(filename string) error {
+	file, err := os.Open(filename)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil // File does not exist, fall back to system environment variables
+		}
+		return err
+	}
+	defer func() {
+		_ = file.Close()
+	}()
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		parts := strings.SplitN(line, "=", 2)
+		if len(parts) == 2 {
+			key := strings.TrimSpace(parts[0])
+			val := strings.TrimSpace(parts[1])
+			val = strings.Trim(val, `"'`) // Strip quotation marks if present
+			if _, exists := os.LookupEnv(key); !exists {
+				_ = os.Setenv(key, val)
+			}
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return fmt.Errorf("error reading %s: %w", filename, err)
+	}
+
+	return nil
 }
