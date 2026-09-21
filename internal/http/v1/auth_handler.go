@@ -6,6 +6,7 @@ import (
 	"auth/internal/http/middleware"
 	"auth/internal/http/response"
 	"encoding/json"
+	"net"
 	"net/http"
 	"strings"
 	"time"
@@ -65,7 +66,7 @@ func (h *AuthHandler) SignUp(w http.ResponseWriter, r *http.Request) {
 		Password:  req.Password,
 		FirstName: req.FirstName,
 		LastName:  req.LastName,
-		IPAddress: &ip,
+		IPAddress: ip,
 		UserAgent: &ua,
 	})
 
@@ -103,7 +104,7 @@ func (h *AuthHandler) SignIn(w http.ResponseWriter, r *http.Request) {
 	result, err := h.authService.SignIn(r.Context(), auth.SignInInput{
 		Email:     req.Email,
 		Password:  req.Password,
-		IPAddress: &ip,
+		IPAddress: ip,
 		UserAgent: &ua,
 	})
 
@@ -222,22 +223,31 @@ func (h *AuthHandler) extractToken(r *http.Request) string {
 	return ""
 }
 
-func clientIP(r *http.Request) string {
-	// Check X-Forwarded-For if behind a reverse proxy (e.g. Cloudflare / Nginx)
+// clientIP extracts a clean IPv4 or IPv6 address suitable for PostgreSQL INET
+func clientIP(r *http.Request) *string {
+	var ip string
+
 	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
 		parts := strings.Split(xff, ",")
-		return strings.TrimSpace(parts[0])
+		ip = strings.TrimSpace(parts[0])
+	} else if xrip := r.Header.Get("X-Real-IP"); xrip != "" {
+		ip = strings.TrimSpace(xrip)
+	} else {
+		// net.SplitHostPort cleanly handles both "[::1]:port" and "127.0.0.1:port"
+		host, _, err := net.SplitHostPort(r.RemoteAddr)
+		if err == nil {
+			ip = host
+		} else {
+			ip = r.RemoteAddr
+		}
 	}
 
-	if xrip := r.Header.Get("X-Real-IP"); xrip != "" {
-		return strings.TrimSpace(xrip)
+	// Strip IPv6 enclosing brackets if any remain
+	ip = strings.TrimPrefix(ip, "[")
+	ip = strings.TrimSuffix(ip, "]")
+	if ip == "" {
+		return nil
 	}
 
-	// Fallback to RemoteAddr
-	addr := r.RemoteAddr
-	if colon := strings.LastIndex(addr, ":"); colon != -1 {
-		return addr[:colon]
-	}
-
-	return addr
+	return &ip
 }

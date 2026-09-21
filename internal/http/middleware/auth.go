@@ -45,7 +45,7 @@ func (m *AuthMiddleware) RequireAuth(next http.Handler) http.Handler {
 
 		// injecting authenticated session and user into request context
 		ctx := context.WithValue(r.Context(), userContextKey, user)
-		ctx = context.WithValue(r.Context(), sessionContextKey, session)
+		ctx = context.WithValue(ctx, sessionContextKey, session)
 
 		next.ServeHTTP(w, r.WithContext(ctx))
 

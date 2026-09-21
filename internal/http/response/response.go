@@ -4,6 +4,7 @@ import (
 	"auth/internal/domain"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"time"
 )
@@ -70,6 +71,7 @@ func Error(w http.ResponseWriter, r *http.Request, err error) {
 		Problem(w, r, http.StatusBadRequest, "Validation Error", err.Error(), "VALIDATION_FAILED")
 	default:
 		// Never leak internal database or server error traces to API callers
+		slog.Error("internal server error", "error", err, "path", r.URL.Path)
 		Problem(w, r, http.StatusInternalServerError, "Internal Server Error", "An unexpected server error occurred", "INTERNAL_SERVER_ERROR")
 	}
 }
