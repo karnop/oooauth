@@ -19,4 +19,12 @@ var (
 	ErrInvalidEmail    = errors.New("invalid email address format")
 	ErrPasswordTooWeak = errors.New("password does not meet security requirements")
 	ErrEmptyField      = errors.New("required field is empty")
+
+	// verifiction, magic link and OTP domain errors
+	ErrTokenNotFound       = errors.New("verification token not found")
+	ErrTokenExpired        = errors.New("verification token has expired")
+	ErrTokenConsumed       = errors.New("verification token has already been used")
+	ErrMaxAttemptsExceeded = errors.New("maximum verification attempts exceeded; token has been invalidated")
+	ErrInvalidOTPCode      = errors.New("invalid 6-digit verification code")
+	ErrRateLimitExceeded   = errors.New("too many requests; please wait before requesting another code")
 )
