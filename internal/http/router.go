@@ -47,9 +47,21 @@ func NewRouter(cfg *config.Config, db *database.DB, authService *auth.Service) h
 	r.Route("/v1", func(r chi.Router) {
 		r.Route("/auth", func(r chi.Router) {
 			// public auth routes
+			// password auth
 			r.Post("/sign-up", authHandler.SignUp)
 			r.Post("/sign-in", authHandler.SignIn)
 			r.Post("/sign-out", authHandler.SignOut)
+
+			// passwordless auth
+			r.Post("/magic-link/send", authHandler.SendMagicLink)
+			r.Post("/magic-link/verify", authHandler.VerifyMagicLink)
+			r.Get("/magic-link/verify", authHandler.VerifyMagicLink)
+
+			r.Post("/otp/send", authHandler.SendOTP)
+			r.Post("/otp/verify", authHandler.VerifyOTP)
+
+			r.Post("/verify-email", authHandler.VerifyEmail)
+			r.Get("/verify-email", authHandler.VerifyEmail) // Link click support
 
 			//  protected auth routes
 			r.Group(func(r chi.Router) {

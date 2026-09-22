@@ -5,6 +5,7 @@ import (
 	"auth/internal/config"
 	"auth/internal/database"
 	internalhttp "auth/internal/http"
+	"auth/internal/mailer"
 	"context"
 	"errors"
 	"fmt"
@@ -49,7 +50,15 @@ func main() {
 	// initializing repos and services
 	userRepo := database.NewUserRepository(db.Pool)
 	sessionRepo := database.NewSessionRepository(db.Pool)
-	authService := auth.NewService(userRepo, sessionRepo, cfg)
+	tokenRepo := database.NewVerificationTokenRepository(db.Pool)
+
+	frontendURL := "http://localhost:3000"
+	if len(cfg.AllowedOrigins) > 0 && cfg.AllowedOrigins[0] != "" {
+		frontendURL = cfg.AllowedOrigins[0]
+	}
+	devMailer := mailer.NewDevMailer(frontendURL)
+
+	authService := auth.NewService(userRepo, sessionRepo, tokenRepo, devMailer, cfg)
 
 	// assembling http router
 	router := internalhttp.NewRouter(cfg, db, authService)

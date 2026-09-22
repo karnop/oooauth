@@ -206,6 +206,62 @@ POST /v1/auth/sign-out-all
 ```
 > Revokes every active session belonging to the user.
 
+#### Passwordless Magic Link (Send)
+```http
+POST /v1/auth/magic-link/send
+Content-Type: application/json
+
+{
+  "email": "user@example.com"
+}
+```
+*Response (200 OK):* Anti-enumeration confirmation.
+
+#### Passwordless Magic Link (Verify)
+```http
+POST /v1/auth/magic-link/verify
+Content-Type: application/json
+
+{
+  "token": "mlk_..."
+}
+```
+*Response (200 OK):* JIT-provisions user if new, marks email verified, returns active session, and sets cookie.
+
+#### Passwordless 6-Digit OTP (Send)
+```http
+POST /v1/auth/otp/send
+Content-Type: application/json
+
+{
+  "email": "user@example.com"
+}
+```
+
+#### Passwordless 6-Digit OTP (Verify)
+```http
+POST /v1/auth/otp/verify
+Content-Type: application/json
+
+{
+  "email": "user@example.com",
+  "code": "482910"
+}
+```
+*Response (200 OK):* Verifies code (with 5-attempt brute-force shield), issues session.
+
+#### Email Verification
+```http
+POST /v1/auth/verify-email
+Content-Type: application/json
+
+{
+  "email": "user@example.com",
+  "code": "482910"
+}
+```
+*(Also supports `GET /v1/auth/verify-email?token=emv_...` for direct link clicks).*
+
 ---
 
 ## 🚦 Error Handling (RFC 7807)
@@ -229,7 +285,7 @@ All non-2xx responses adhere to the RFC 7807 Problem Details standard:
 ## 🧭 Master Roadmap (12 Versions)
 
 - [x] **v1: Core Identity & Email/Password Authentication**
-- [ ] **v2: Passwordless & Email Verification (Magic Links & Numeric OTP)**
+- [x] **v2: Passwordless & Email Verification (Magic Links & Numeric OTP)**
 - [ ] **v3: OAuth 2.0 & Social Logins (Google, GitHub, Apple)**
 - [ ] **v4: Multi-Factor Authentication (TOTP Authenticator & Backup Codes)**
 - [ ] **v5: Asymmetric JWTs, JWKS Rotation & Distributed Auth**
