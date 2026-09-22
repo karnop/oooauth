@@ -36,6 +36,30 @@ type SignInRequest struct {
 	Password string `json:"password"`
 }
 
+// magic link and otp requests
+type SendMagicLinkRequest struct {
+	Email string `json:"email"`
+}
+
+type VerifyMagicLinkRequest struct {
+	Token string `json:"token"`
+}
+
+type SendOTPRequest struct {
+	Email string `json:"email"`
+}
+
+type VerifyEmailRequest struct {
+	Token string `json:"token,omitempty"`
+	Email string `json:"email,omitempty"`
+	Code  string `json:"code,omitempty"`
+}
+
+type VerifyOTPRequest struct {
+	Email string `json:"email"`
+	Code  string `json:"code"`
+}
+
 type SessionResponse struct {
 	ID        string    `json:"id"`
 	Token     string    `json:"token"`
@@ -221,6 +245,182 @@ func (h *AuthHandler) extractToken(r *http.Request) string {
 	}
 
 	return ""
+}
+
+// ------- magic link and otp handlers
+
+// POST /v1/auth/magic-link/send
+func (h *AuthHandler) SendMagicLink(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+
+	var req SendMagicLinkRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		response.Problem(w, r, http.StatusBadRequest, "Invalid Request Body", "Request payload must be valid JSON", "INVALID_JSON")
+		return
+	}
+
+	ip := clientIP(r)
+	ua := r.UserAgent()
+	if err := h.authService.SendMagicLink(r.Context(), req.Email, ip, &ua); err != nil {
+		response.Error(w, r, err)
+		return
+	}
+	response.JSON(w, http.StatusOK, map[string]string{
+		"message": "If an account exists or is eligible, a magic sign-in link has been sent.",
+	})
+
+}
+
+// POST & GET /v1/auth/magic-link/verify
+func (h *AuthHandler) VerifyMagicLink(w http.ResponseWriter, r *http.Request) {
+	var token string
+	if r.Method == http.MethodGet {
+		token = r.URL.Query().Get("token")
+	} else {
+		r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+		var req VerifyMagicLinkRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			response.Problem(w, r, http.StatusBadRequest, "Invalid Request Body", "Request payload must be valid JSON", "INVALID_JSON")
+			return
+		}
+		token = req.Token
+	}
+
+	if token == "" {
+		response.Problem(w, r, http.StatusBadRequest, "Missing Token", "Verification token is required", "MISSING_TOKEN")
+		return
+	}
+
+	ip := clientIP(r)
+	ua := r.UserAgent()
+
+	result, err := h.authService.VerifyMagicLink(r.Context(), token, ip, &ua)
+	if err != nil {
+		response.Error(w, r, err)
+		return
+	}
+
+	h.setSessionCookie(w, result.RawToken, h.cfg.SessionTTL)
+
+	response.JSON(w, http.StatusOK, AuthSuccessResponse{
+		User: result.User,
+		Session: SessionResponse{
+			ID:        result.Session.ID.String(),
+			Token:     result.RawToken,
+			ExpiresAt: result.Session.ExpiresAt,
+		},
+	})
+}
+
+// POST /v1/auth/otp/send
+func (h *AuthHandler) SendOTP(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+	var req SendOTPRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		response.Problem(w, r, http.StatusBadRequest, "Invalid Request Body", "Request payload must be valid JSON", "INVALID_JSON")
+		return
+	}
+
+	ip := clientIP(r)
+	ua := r.UserAgent()
+
+	if err := h.authService.SendOTP(r.Context(), req.Email, ip, &ua); err != nil {
+		response.Error(w, r, err)
+		return
+	}
+
+	response.JSON(w, http.StatusOK, map[string]string{
+		"message": "If an account exists, a 6-digit login passcode has been sent.",
+	})
+}
+
+// POST /v1/auth/otp/verify
+func (h *AuthHandler) VerifyOTP(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+	var req VerifyOTPRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		response.Problem(w, r, http.StatusBadRequest, "Invalid Request Body", "Request payload must be valid JSON", "INVALID_JSON")
+		return
+	}
+
+	ip := clientIP(r)
+	ua := r.UserAgent()
+
+	result, err := h.authService.VerifyOTP(r.Context(), req.Email, req.Code, ip, &ua)
+	if err != nil {
+		response.Error(w, r, err)
+		return
+	}
+
+	h.setSessionCookie(w, result.RawToken, h.cfg.SessionTTL)
+	response.JSON(w, http.StatusOK, AuthSuccessResponse{
+		User: result.User,
+		Session: SessionResponse{
+			ID:        result.Session.ID.String(),
+			Token:     result.RawToken,
+			ExpiresAt: result.Session.ExpiresAt,
+		},
+	})
+}
+
+// POST & GET /v1/auth/verify-email
+func (h *AuthHandler) VerifyEmail(w http.ResponseWriter, r *http.Request) {
+	// Support query parameter for GET link clicks
+	if r.Method == http.MethodGet {
+		token := r.URL.Query().Get("token")
+		if token == "" {
+			response.Problem(w, r, http.StatusBadRequest, "Missing Token", "Verification token is required in query", "MISSING_TOKEN")
+			return
+		}
+
+		user, err := h.authService.VerifyEmailToken(r.Context(), token)
+		if err != nil {
+			response.Error(w, r, err)
+			return
+		}
+
+		response.JSON(w, http.StatusOK, map[string]any{
+			"message": "Email successfully verified",
+			"user":    user,
+		})
+		return
+	}
+
+	// JSON POST: support either token string OR email + 6-digit code
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+	var req VerifyEmailRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		response.Problem(w, r, http.StatusBadRequest, "Invalid Request Body", "Request payload must be valid JSON", "INVALID_JSON")
+		return
+	}
+
+	if req.Token != "" {
+		user, err := h.authService.VerifyEmailToken(r.Context(), req.Token)
+		if err != nil {
+			response.Error(w, r, err)
+			return
+		}
+		response.JSON(w, http.StatusOK, map[string]any{
+			"message": "Email successfully verified",
+			"user":    user,
+		})
+		return
+	}
+
+	if req.Email != "" && req.Code != "" {
+		user, err := h.authService.VerifyEmailOTP(r.Context(), req.Email, req.Code)
+		if err != nil {
+			response.Error(w, r, err)
+			return
+		}
+		response.JSON(w, http.StatusOK, map[string]any{
+			"message": "Email successfully verified",
+			"user":    user,
+		})
+		return
+	}
+
+	response.Problem(w, r, http.StatusBadRequest, "Missing Verification Credentials", "Provide either 'token' or both 'email' and 'code'", "MISSING_CREDENTIALS")
 }
 
 // clientIP extracts a clean IPv4 or IPv6 address suitable for PostgreSQL INET

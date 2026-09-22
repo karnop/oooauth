@@ -146,3 +146,23 @@ func (r *PostgresUserRepository) IncrementSignInCount(ctx context.Context, id uu
 
 	return nil
 }
+
+func (r *PostgresUserRepository) SetEmailVerified(ctx context.Context, id uuid.UUID, verified bool) error {
+	query := `
+		UPDATE users 
+		SET email_verified = $1, updated_at = NOW() 
+		WHERE id = $2
+	`
+
+	cmdTag, err := r.pool.Exec(ctx, query, verified, id)
+
+	if err != nil {
+		return fmt.Errorf("failed to set email verified: %w", err)
+	}
+
+	if cmdTag.RowsAffected() == 0 {
+		return domain.ErrUserNotFound
+	}
+
+	return nil
+}

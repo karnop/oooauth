@@ -69,6 +69,21 @@ func Error(w http.ResponseWriter, r *http.Request, err error) {
 		Problem(w, r, http.StatusForbidden, "Account Suspended", "This user account has been suspended", "USER_SUSPENDED")
 	case errors.Is(err, domain.ErrInvalidEmail), errors.Is(err, domain.ErrPasswordTooWeak), errors.Is(err, domain.ErrEmptyField):
 		Problem(w, r, http.StatusBadRequest, "Validation Error", err.Error(), "VALIDATION_FAILED")
+
+	// passwordless magic link and otp errors
+	case errors.Is(err, domain.ErrTokenNotFound):
+		Problem(w, r, http.StatusNotFound, "Token Not Found", "The verification token is invalid or does not exist", "TOKEN_NOT_FOUND")
+	case errors.Is(err, domain.ErrTokenExpired):
+		Problem(w, r, http.StatusBadRequest, "Token Expired", "The verification token or OTP has expired", "TOKEN_EXPIRED")
+	case errors.Is(err, domain.ErrTokenConsumed):
+		Problem(w, r, http.StatusConflict, "Token Already Used", "This token has already been verified and cannot be reused", "TOKEN_ALREADY_USED")
+	case errors.Is(err, domain.ErrMaxAttemptsExceeded):
+		Problem(w, r, http.StatusTooManyRequests, "Max Attempts Exceeded", "Maximum verification attempts exceeded; this code has been permanently invalidated", "MAX_ATTEMPTS_EXCEEDED")
+	case errors.Is(err, domain.ErrInvalidOTPCode):
+		Problem(w, r, http.StatusBadRequest, "Invalid Code", "The 6-digit verification code is incorrect", "INVALID_OTP_CODE")
+	case errors.Is(err, domain.ErrRateLimitExceeded):
+		Problem(w, r, http.StatusTooManyRequests, "Rate Limited", "Please wait at least 60 seconds before requesting another code", "RATE_LIMIT_EXCEEDED")
+
 	default:
 		// Never leak internal database or server error traces to API callers
 		slog.Error("internal server error", "error", err, "path", r.URL.Path)

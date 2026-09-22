@@ -13,6 +13,7 @@ type UserRepository interface {
 	Update(ctx context.Context, user *User) error
 	UpdatePassword(ctx context.Context, id uuid.UUID, passwordHash string) error
 	IncrementSignInCount(ctx context.Context, id uuid.UUID) error
+	SetEmailVerified(ctx context.Context, id uuid.UUID, verified bool) error
 }
 
 type SessionRepository interface {
@@ -21,4 +22,13 @@ type SessionRepository interface {
 	Revoke(ctx context.Context, id uuid.UUID) error
 	RevokeAllByUserID(ctx context.Context, userID uuid.UUID) error
 	UpdateLastActive(ctx context.Context, id uuid.UUID) error
+}
+
+type VerificationTokenRepository interface {
+	Create(ctx context.Context, token *VerificationToken) error
+	GetByTokenHash(ctx context.Context, tokenHash string) (*VerificationToken, error)
+	GetLatestActiveByEmailAndType(ctx context.Context, email string, TokenType TokenType) (*VerificationToken, error)
+	IncrementAttempts(ctx context.Context, id uuid.UUID) error
+	MarkConsumed(ctx context.Context, id uuid.UUID) error
+	DeleteExpired(ctx context.Context) error
 }
